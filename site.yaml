@@ -1,0 +1,57 @@
+---
+- hosts: dbserver
+  tasks:
+    - yum:
+        name: mariadb105-server
+        state: latest
+    - copy:
+        src: source/create_db_webtest.sql
+        dest: /tmp/create_db_webtest.sql
+    - service:
+        name: mariadb
+        state: started
+    - shell: "mysql -uroot < /tmp/create_db_webtest.sql"
+      register: db_result
+      ignore_errors: yes
+
+- name: Deploy Webserber apache-php
+  hosts: webserver
+  vars:
+    var_team: "Test team"
+  tasks:
+    - name: Install httpd
+      yum:
+        name: httpd
+        state: latest
+    - name: Install php 
+      yum: 
+        name: "{{ item }}"
+        state: latest
+      loop: 
+        - php
+        - php-common
+        - php-opcache
+        - php-cli
+        - php-gd
+        - php-curl
+        - php-mysqlnd
+        - php-mysqli
+
+    - name: copy index
+      template:
+        src: source/index.php.j2
+        dest: /var/www/html/index.php
+
+    - name: copy php source
+      copy: 
+        src: "{{ item }}"
+        dest: /var/www/html/
+      loop:
+        - source/create.php
+        - source/process_create.php
+
+    - name: Ensuer httpd is running 
+      service:
+        name: httpd
+        state: restarted
+        enabled: yes
